@@ -1,3 +1,5 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.project.referencedLibraries": [
+        "/home/think/tomcat/lib/servlet-api.jar"
+    ]
 }
