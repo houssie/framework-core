@@ -1,4 +1,4 @@
-package etu4179.framework;
+package framework;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -58,16 +58,16 @@ public class FrontServlet extends HttpServlet {
                 Class<?> clazz = Class.forName(fullClassName);
 
                 // Vérifier si la classe possède notre annotation @Controller
-                if (clazz.isAnnotationPresent(etu4179.framework.annotation.Controller.class)) {
+                if (clazz.isAnnotationPresent(framework.annotation.Controller.class)) {
                     
                     // Parcourir toutes les méthodes de cette classe
                     java.lang.reflect.Method[] methods = clazz.getDeclaredMethods();
                     for (java.lang.reflect.Method method : methods) {
                         
                         // Vérifier si la méthode possède l'annotation @Url
-                        if (method.isAnnotationPresent(etu4179.framework.annotation.Url.class)) {
+                        if (method.isAnnotationPresent(framework.annotation.Url.class)) {
                             // Récupérer la valeur de l'URL (ex: "/aaa/client")
-                            etu4179.framework.annotation.Url urlAnnotation = method.getAnnotation(etu4179.framework.annotation.Url.class);
+                            framework.annotation.Url urlAnnotation = method.getAnnotation(framework.annotation.Url.class);
                             String urlValue = urlAnnotation.value();
 
                             // Créer notre Mapping et l'ajouter à la HashMap
