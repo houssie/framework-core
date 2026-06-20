@@ -1,4 +1,4 @@
-package framework.annotation;
+package framework.mg.itu.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
