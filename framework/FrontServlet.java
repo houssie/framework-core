@@ -1,10 +1,8 @@
 package framework;
 
 import framework.mg.itu.annotation.Url;
-import framework.PackageScanner;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -16,15 +14,16 @@ public class FrontServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         try {
-            // 1. On récupère le chemin physique du dossier des classes
-            String path = getServletContext().getRealPath("/WEB-INF/classes");
-            // 2. On utilise le scanner pour trouver les contrôleurs
-            // Le nouvel appel correspondant à votre méthode getControllers
-// Remplacez "votre.package.controleurs" par le vrai nom du package 
-// où se trouvent vos classes annotées @Controller
-List<Class<?>> controllers = PackageScanner.getControllers("mg.itu.controllers");
+            // 1. Récupération dynamique du package à scanner via le web.xml
+            String packageName = getInitParameter("packageToScan");
+            if (packageName == null || packageName.isEmpty()) {
+                throw new ServletException("Le paramètre 'packageToScan' est obligatoire dans web.xml");
+            }
 
-            // 3. On remplit la Map avec les URLs
+            // 2. Scan des contrôleurs via l'outil dédié
+            List<Class<?>> controllers = PackageScanner.getControllers(packageName);
+
+            // 3. Enregistrement des mappings (URL -> Classe/Méthode)
             for (Class<?> clazz : controllers) {
                 for (Method m : clazz.getDeclaredMethods()) {
                     if (m.isAnnotationPresent(Url.class)) {
@@ -34,27 +33,43 @@ List<Class<?>> controllers = PackageScanner.getControllers("mg.itu.controllers")
                 }
             }
         } catch (Exception e) {
-            throw new ServletException(e);
+            throw new ServletException("Erreur lors de l'initialisation du framework : " + e.getMessage(), e);
         }
     }
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        String url = req.getRequestURI().substring(req.getContextPath().length());
-        
-        if (mappingUrls.containsKey(url)) {
-            try {
-                Mapping map = mappingUrls.get(url);
-                Class<?> clazz = Class.forName(map.getClassName());
-                Object instance = clazz.getDeclaredConstructor().newInstance();
-                clazz.getDeclaredMethod(map.getMethodName()).invoke(instance);
-                res.getWriter().println("Execution reussie pour : " + url);
-            } catch (Exception e) {
-                res.sendError(500, e.getMessage());
-            }
-        } else {
-            res.sendError(404, "Page non trouvee");
-        }
+    // 1. Récupération de l'URL relative (ex: /index.html ou /clients)
+    String url = req.getRequestURI().substring(req.getContextPath().length());
+
+    // 2. Vérification : est-ce un fichier physique existant ?
+    // Si le fichier existe et qu'il n'est pas géré par une route de votre framework
+    if (getServletContext().getResource(url) != null && !url.equals("/") && !mappingUrls.containsKey(url)) {
+        // C'est un fichier statique (HTML, CSS, JS), on arrête le framework ici
+        // et on laisse Tomcat servir le fichier normalement.
+        return; 
     }
+
+    // 3. Logique du Framework : gestion des routes annotées
+    if (mappingUrls.containsKey(url)) {
+        try {
+            Mapping map = mappingUrls.get(url);
+            // Chargement dynamique de la classe contrôleur
+            Class<?> clazz = Class.forName(map.getClassName());
+            Object instance = clazz.getDeclaredConstructor().newInstance();
+            
+            // Exécution de la méthode correspondante
+            clazz.getDeclaredMethod(map.getMethodName()).invoke(instance);
+            
+            // Réponse de succès
+            res.getWriter().println("Execution reussie pour : " + url);
+        } catch (Exception e) {
+            res.sendError(500, "Erreur lors de l'exécution : " + e.getMessage());
+        }
+    } else {
+        // 4. Si ce n'est ni un fichier, ni une route définie, c'est une 404
+        res.sendError(404, "Page non trouvee");
+    }
+}
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException { processRequest(req, res); }
