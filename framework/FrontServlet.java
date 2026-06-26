@@ -1,6 +1,6 @@
 package framework;
 
-import framework.mg.itu.annotation.Url;
+import framework.mg.itu.annotation.UrlMapping;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 
 public class FrontServlet extends HttpServlet {
-    private HashMap<String, Mapping> mappingUrls = new HashMap<>();
+    private HashMap<String, String[]> mappingUrls = new HashMap<>();
 
     @Override
     public void init() throws ServletException {
@@ -26,9 +26,10 @@ public class FrontServlet extends HttpServlet {
             // 3. Enregistrement des mappings (URL -> Classe/Méthode)
             for (Class<?> clazz : controllers) {
                 for (Method m : clazz.getDeclaredMethods()) {
-                    if (m.isAnnotationPresent(Url.class)) {
-                        String url = m.getAnnotation(Url.class).value();
-                        mappingUrls.put(url, new Mapping(clazz.getName(), m.getName()));
+                    if (m.isAnnotationPresent(UrlMapping.class)) {
+                        String url = m.getAnnotation(UrlMapping.class).value();
+                        String[] mappingInfo = {clazz.getName(), m.getName()};
+                        mappingUrls.put(url, mappingInfo);
                     }
                 }
             }
@@ -52,13 +53,16 @@ public class FrontServlet extends HttpServlet {
     // 3. Logique du Framework : gestion des routes annotées
     if (mappingUrls.containsKey(url)) {
         try {
-            Mapping map = mappingUrls.get(url);
+            String[] mapInfo = mappingUrls.get(url);
+            String className = mapInfo[0];
+            String methodName = mapInfo[1];
+
             // Chargement dynamique de la classe contrôleur
-            Class<?> clazz = Class.forName(map.getClassName());
+            Class<?> clazz = Class.forName(className);
             Object instance = clazz.getDeclaredConstructor().newInstance();
             
             // Exécution de la méthode correspondante
-            clazz.getDeclaredMethod(map.getMethodName()).invoke(instance);
+            clazz.getDeclaredMethod(methodName).invoke(instance);
             
             // Réponse de succès
             res.getWriter().println("Execution reussie pour : " + url);
