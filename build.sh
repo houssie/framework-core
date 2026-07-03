@@ -15,7 +15,7 @@ echo "--------------------------------------------------"
 
 # On liste les dossiers contenant du code pour aider javac
 # Utiliser 'find' est le moyen le plus sûr de trouver tous les .java
-SOURCES=$(find framework -name "*.java")
+SOURCES=$(find . -name "*.java")
 
 javac -cp "$CHEMIN_TOMCAT/lib/servlet-api.jar" -d bin $SOURCES
 
