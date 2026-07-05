@@ -13,37 +13,20 @@ import java.util.Map;
 
 public class FrontServlet extends HttpServlet {
     private Map<UrlMethod, UrlMapping > mappingUrls = new HashMap<>();
-    private List<Class<?>> scannedControllers;
 
     @Override
     public void init() throws ServletException {
-        try {
-            // 1. Récupération dynamique du package à scanner via le web.xml
-            String packageName = getInitParameter("packageToScan");
-            if (packageName == null || packageName.isEmpty()) {
-                throw new ServletException("Le paramètre 'packageToScan' est obligatoire dans web.xml");
-            }
-
-            // 2. Scan des contrôleurs via l'outil dédié
-            this.scannedControllers = PackageScanner.getControllers(packageName);
-
-            // 3. Enregistrement des mappings (URL -> Classe/Méthode)
-            for (Class<?> clazz : this.scannedControllers) {
-                for (Method m : clazz.getDeclaredMethods()) {
-                    if (m.isAnnotationPresent(Url.class)) {
-                        Url urlAnnotation = m.getAnnotation(Url.class);
-                        UrlMethod key = new UrlMethod(urlAnnotation.value(), urlAnnotation.method());
-                        if (mappingUrls.containsKey(key)) {
-                            throw new ServletException("Conflit de route : L'URL " + key + " est déjà définie.");
-                        }
-                        UrlMapping mapping = new UrlMapping(clazz, m);
-                        mappingUrls.put(key, mapping);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            throw new ServletException("Erreur lors de l'initialisation du framework : " + e.getMessage(), e);
+        // La logique de scan est maintenant dans AppListener.
+        // On récupère simplement les données depuis le ServletContext.
+        Object mappingUrlsObject = getServletContext().getAttribute("mappingUrls");
+        
+        if (mappingUrlsObject instanceof Map) {
+            this.mappingUrls = (Map<UrlMethod, UrlMapping>) mappingUrlsObject;
+        } else {
+            // Si la map est introuvable, c'est une erreur critique.
+            throw new ServletException("ERREUR: La table de routage (mappingUrls) est introuvable dans le ServletContext. L'AppListener a-t-il échoué ?");
         }
+        System.out.println("FrontServlet: Récupération de " + this.mappingUrls.size() + " routes.");
     }
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException {
@@ -61,16 +44,7 @@ public class FrontServlet extends HttpServlet {
         html.append("<h1>").append(projectName).append("</h1>");
         html.append("<p>Votre framework est opérationnel.</p>");
 
-        html.append("<h2>Contrôleurs Scannés</h2>");
-        if (scannedControllers == null || scannedControllers.isEmpty()) {
-            html.append("<p>Aucun contrôleur trouvé.</p>");
-        } else {
-            html.append("<ul>");
-            for (Class<?> controller : scannedControllers) {
-                html.append("<li>").append(controller.getName()).append("</li>");
-            }
-            html.append("</ul>");
-        }
+        // La liste des contrôleurs n'est plus affichée ici pour alléger la servlet.
 
         html.append("<h2>Routes Enregistrées</h2><ul>");
         mappingUrls.forEach((k, v) -> html.append("<li><b>").append(k.getHttpMethod()).append("</b> ").append(k.getUrl()).append(" &rarr; ").append(v.getControllerMethod().getName()).append("()</li>"));
