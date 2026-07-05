@@ -1,12 +1,22 @@
 package framework.mg.itu.annotation;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.reflect.Method;
 
-@Target(ElementType.METHOD)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface UrlMapping {
-    String value();
+public class UrlMapping {
+    private Class<?> controllerClass;
+    private Method controllerMethod ;
+
+    public UrlMapping (Class<?> controllerClass , Method controllerMethod){
+        this.controllerClass = controllerClass;
+        this.controllerMethod= controllerMethod;
+    }
+
+    public Class<?> getControllerClass() {
+        return controllerClass;
+    }
+
+    public Method getControllerMethod() {
+        return controllerMethod;
+    }
+
 }
