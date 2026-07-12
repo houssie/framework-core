@@ -1,0 +1,105 @@
+SPRINT 0:
+-creation de FrontServlet
+
+SPRINT 1:
+-Cree annotation dans le framework: mg.itu.annotation.Controller
+on envoie le l'annotation.controller dans le framework.jar et on deploie sur tomcat avec l'app Web test
+
+-Chargement de Classe (Obligatoire) : parcours tout les classes dans l'app Web test meme elle-meme et elle est executer par le programme 
+des le demarrage de l'app Web test
+Pour cela :
+    -Soit utiliser Package specifique
+    -Soit utiliser All
+
+-Démarrage appel web (Optionnel)
+    -Void init ou on appel ContextListener
+
+Creer un classe utilitaire qui a une méthode avec un argument packageName :
+Ce qu'il fait il cherche tout les classes de l'app Web test ayant ce packageName et annotée mg.itu.annotation.Controller
+
+
+
+SPRINT 2:
+-afficher dans la page les urls trouves dans le controller trouver
+-Creation Urlmapping
+
+SPRINT 3:
+Sprint 3 - NORMAL :
+@Url("/test", "GET")
+@Url("/test", "POST")
+par defaut GET si pas défini POST ou GET 
+Map(URL, (Method et Class)) -> UrlMethode(String url, String Methodtype)
+utilisation de equals 
+
+Sprint 3 - BIS :
+execute les methodes dans le @Url
+
+Sprint 4 :
+ServletContext dans init()
+dans le Listener Void getMap(..., map)
+
+Sprint 5 :
+Creation de donnée en dur et envoye de ce donnée dans le controller 
+
+@Urlmapping ()
+list(){
+    ModelAndView ...
+    ....setView("");
+    ....setAttribut();
+}
+
+ModelAndView
+-View
+-setAttribut(String, Object)
+
+dans web.xml 
+view.prefix
+view.suffix
+
+
+
+1. La création de la classe ModelAndView
+
+Tu dois créer une classe chargée de transporter à la fois le nom de la vue et les données du modèle. Elle doit posséder :
+
+    Un attribut pour la vue (ex: String view).
+
+    Une structure pour stocker les données (une HashMap).
+
+    La méthode exacte spécifiée : setAttribut(String, Object) (ou setAttribute selon la casse de ton sujet) pour y ajouter des données.
+
+    Une méthode pour définir la vue (ex: setView(String)).
+
+2. La configuration des paramètres dans web.xml
+
+Tu dois ajouter des paramètres d'initialisation (<init-param>) spécifiques à ta FrontServlet dans ton fichier de configuration pour externaliser les extensions et les dossiers :
+
+    view.prefix : Le dossier où se trouvent tes fichiers de vue (ex: /WEB-INF/jsp/).
+
+    view.suffix : L'extension de tes fichiers (ex: .jsp).
+
+3. La récupération et l'aiguillage dans FrontServlet
+
+Dans la méthode init() de ton servlet, tu dois récupérer ces deux paramètres. Ensuite, lors du traitement de la requête (processRequest) :
+
+    Si la méthode de ton contrôleur renvoie un objet ModelAndView :
+
+        Tu extrais toutes les données stockées dans sa Map et tu les injectes dans les attributs de la requête (request.setAttribute(clé, valeur)).
+
+        Tu construis dynamiquement le chemin final vers la vue : prefix + view + suffix.
+
+        Tu passes le relais à cette vue en faisant un forward (request.getRequestDispatcher(...).forward(request, response)).
+
+4. Le test dans le contrôleur (Données en dur)
+
+Tu dois écrire une méthode de test (souvent nommée list()) associée à une annotation @UrlMapping qui :
+
+    Instancie un objet ModelAndView.
+
+    Crée une donnée fictive en dur (comme une liste ou un objet).
+
+    Envoie cette donnée à la vue via mv.setAttribut("nom", donnee).
+
+    Spécifie la vue cible via mv.setView("nomDeLaVue").
+
+    Retourne l'objet ModelAndView.
