@@ -3,6 +3,7 @@ package framework;
 import framework.mg.itu.annotation.UrlMapping;
 import framework.mg.itu.annotation.UrlMethod;
 import framework.mg.itu.annotation.Url;
+import framework.mg.itu.view.ModelAndView;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -13,6 +14,8 @@ import java.util.Map;
 
 public class FrontServlet extends HttpServlet {
     private Map<UrlMethod, UrlMapping > mappingUrls = new HashMap<>();
+    private String viewPrefix;
+    private String viewSuffix;
 
     @Override
     public void init() throws ServletException {
@@ -26,6 +29,10 @@ public class FrontServlet extends HttpServlet {
             // Si la map est introuvable, c'est une erreur critique.
             throw new ServletException("ERREUR: La table de routage (mappingUrls) est introuvable dans le ServletContext. L'AppListener a-t-il échoué ?");
         }
+
+        // Récupération des paramètres de configuration pour les vues
+        this.viewPrefix = getInitParameter("view.prefix");
+        this.viewSuffix = getInitParameter("view.suffix");
         System.out.println("FrontServlet: Récupération de " + this.mappingUrls.size() + " routes.");
     }
 
@@ -75,13 +82,23 @@ public class FrontServlet extends HttpServlet {
             Object result = method.invoke(instance);
             
             // --- GESTION DU RETOUR ---
-            if (result instanceof String) {
+            if (result instanceof ModelAndView) {
+                ModelAndView mv = (ModelAndView) result;
+                // 1. Injecter les données du modèle dans les attributs de la requête
+                mv.getData().forEach(req::setAttribute);
+
+                // 2. Construire le chemin de la vue et faire un forward
+                String viewPath = this.viewPrefix + mv.getView() + this.viewSuffix;
+                req.getRequestDispatcher(viewPath).forward(req, res);
+
+            } else if (result instanceof String) {
                 // Si c'est une chaîne, on l'affiche
                 res.setContentType("text/html;charset=UTF-8");
                 res.getWriter().println(result);
             }
             // (Dans le futur, on pourra ajouter des 'else if' pour gérer d'autres types comme ModelView, JSON, etc.)
         } catch (Exception e) {
+            e.printStackTrace(); // Utile pour le débogage
             res.sendError(500, "Erreur lors de l'exécution de la méthode du contrôleur : " + e.getMessage());
         }
     } else {
