@@ -10,36 +10,61 @@ import framework.mg.itu.annotation.Controller;
 public class PackageScanner {
 
     /**
-     * Scanne un package donné pour trouver toutes les classes 
-     * annotées avec @Controller.
+     * Scanne un ou plusieurs packages (séparés par des virgules)
+     * pour trouver toutes les classes annotées avec @Controller.
+     *
+     * Exemple : "com.test.controllers,mg.itu.controllers"
      */
-    public static List<Class<?>> getControllers(String packageName) throws Exception {
+    public static List<Class<?>> getControllers(String packageNames) throws Exception {
         List<Class<?>> controllers = new ArrayList<>();
-        
-        // 1. Traduction du package en chemin système (ex: mg/itu/controllers)
+
+        if (packageNames == null || packageNames.isEmpty()) {
+            return controllers;
+        }
+
+        // On découpe sur la virgule
+        String[] packages = packageNames.split(",");
+
+        for (String pkg : packages) {
+            pkg = pkg.trim();
+            if (pkg.isEmpty()) continue;
+            controllers.addAll(getControllersFromPackage(pkg));
+        }
+
+        return controllers;
+    }
+
+    /**
+     * Scanne un seul package.
+     */
+    private static List<Class<?>> getControllersFromPackage(String packageName) throws Exception {
+        List<Class<?>> controllers = new ArrayList<>();
+
         String path = packageName.replace('.', '/');
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         URL resource = classLoader.getResource(path);
-        
+
         if (resource == null) {
-            throw new Exception("Le package " + packageName + " est introuvable.");
+            System.out.println("⚠️ Package introuvable (ignoré) : " + packageName);
+            return controllers;
         }
 
         File directory = new File(resource.getFile());
-        if (directory.exists()) {
-            for (File file : directory.listFiles()) {
-                if (file.getName().endsWith(".class")) {
-                    // 2. Création du nom complet de la classe (ex: mg.itu.controllers.TestController)
-                    String className = packageName + "." + file.getName().replace(".class", "");
-                    Class<?> clazz = Class.forName(className);
-                    
-                    // 3. Filtrage par Réflexion : Est-ce un @Controller ?
-                    if (clazz.isAnnotationPresent(Controller.class)) {
-                        controllers.add(clazz);
-                    }
+        if (!directory.exists()) {
+            return controllers;
+        }
+
+        for (File file : directory.listFiles()) {
+            if (file.getName().endsWith(".class")) {
+                String className = packageName + "." + file.getName().replace(".class", "");
+                Class<?> clazz = Class.forName(className);
+
+                if (clazz.isAnnotationPresent(Controller.class)) {
+                    controllers.add(clazz);
                 }
             }
         }
+
         return controllers;
     }
 }
