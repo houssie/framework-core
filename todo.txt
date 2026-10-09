@@ -103,3 +103,7 @@ Tu dois écrire une méthode de test (souvent nommée list()) associée à une a
     Spécifie la vue cible via mv.setView("nomDeLaVue").
 
     Retourne l'objet ModelAndView.
+    
+    
+    
+ objet et liste d objet 
