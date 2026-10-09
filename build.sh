@@ -17,7 +17,6 @@ echo "--------------------------------------------------"
 echo "⚙️ [2/4] Compilation du Framework..."
 echo "--------------------------------------------------"
 
-# On exclut les dossiers cachés (.kilo, .git, .idea, etc.) et les dossiers techniques
 SOURCES=$(find . -name "*.java" \
     -not -path "./libs/*" \
     -not -path "./build_tmp/*" \
@@ -28,7 +27,7 @@ echo "Fichiers à compiler :"
 echo "$SOURCES"
 echo "--------------------------------------------------"
 
-javac -cp "$CHEMIN_SERVLET:$CHEMIN_GSON" -d bin $SOURCES
+javac -parameters -cp "$CHEMIN_SERVLET:$CHEMIN_GSON" -d bin $SOURCES
 
 if [ $? -ne 0 ]; then
     echo "❌ Erreur de compilation !"
@@ -37,7 +36,7 @@ fi
 echo "✅ Fichiers .class générés dans bin/"
 
 echo "--------------------------------------------------"
-echo "📦 [3/4] Préparation du contenu du fat jar..."
+echo "📦 [3/4] Préparation du fat jar..."
 echo "--------------------------------------------------"
 
 cp -r bin/* $DOSSIER_TEMP/
@@ -46,18 +45,17 @@ cd $DOSSIER_TEMP
 jar -xf "../$CHEMIN_GSON"
 cd ..
 
-# Suppression des signatures de Gson (sinon SecurityException au chargement)
 rm -rf $DOSSIER_TEMP/META-INF/*.SF
 rm -rf $DOSSIER_TEMP/META-INF/*.DSA
 rm -rf $DOSSIER_TEMP/META-INF/*.RSA
 
-echo "✅ Contenu fusionné (framework + Gson)"
+echo "✅ Contenu fusionné"
 
 echo "--------------------------------------------------"
 echo "🎁 [4/4] Création du fat jar framework.jar..."
 echo "--------------------------------------------------"
-jar -cvf framework.jar -C $DOSSIER_TEMP .
+jar -cf framework.jar -C $DOSSIER_TEMP .
 
 rm -rf $DOSSIER_TEMP
 
-echo "🎉 Opération terminée : framework.jar est prêt (avec Gson inclus) !"
+echo "🎉 framework.jar prêt !"

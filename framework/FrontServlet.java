@@ -22,21 +22,24 @@ public class FrontServlet extends HttpServlet {
 
     @Override
     public void init() throws ServletException {
-        // La logique de scan est maintenant dans AppListener.
-        // On récupère simplement les données depuis le ServletContext.
+        // ===== Récupération de la table de routage depuis le ServletContext =====
         Object mappingUrlsObject = getServletContext().getAttribute("mappingUrls");
 
         if (mappingUrlsObject instanceof Map) {
             this.mappingUrls = (Map<UrlMethod, UrlMapping>) mappingUrlsObject;
         } else {
-            // Si la map est introuvable, c'est une erreur critique.
             throw new ServletException("ERREUR: La table de routage (mappingUrls) est introuvable dans le ServletContext. L'AppListener a-t-il échoué ?");
         }
 
-        // Récupération des paramètres de configuration pour les vues
-        this.viewPrefix = getInitParameter("view.prefix");
-        this.viewSuffix = getInitParameter("view.suffix");
+        // ===== Récupération des paramètres de configuration pour les vues =====
+        // ⚠️ IMPORTANT : on utilise getServletContext().getInitParameter(...)
+        // pour lire les <context-param> du web.xml
+        // (et NON getInitParameter(...) qui lit les <init-param> du <servlet>)
+        this.viewPrefix = getServletContext().getInitParameter("view.prefix");
+        this.viewSuffix = getServletContext().getInitParameter("view.suffix");
+
         System.out.println("FrontServlet: Récupération de " + this.mappingUrls.size() + " routes.");
+        System.out.println("FrontServlet: viewPrefix = [" + this.viewPrefix + "], viewSuffix = [" + this.viewSuffix + "]");
     }
 
     protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws IOException {
@@ -53,18 +56,19 @@ public class FrontServlet extends HttpServlet {
             html.append("<html><head><title>Welcome to ").append(projectName).append("</title></head><body>");
             html.append("<h1>").append(projectName).append("</h1>");
             html.append("<p>Votre framework est opérationnel.</p>");
-
             html.append("<h2>Routes Enregistrées</h2><ul>");
-            mappingUrls.forEach((k, v) -> html.append("<li><b>").append(k.getHttpMethod()).append("</b> ").append(k.getUrl()).append(" &rarr; ").append(v.getControllerMethod().getName()).append("()</li>"));
+            mappingUrls.forEach((k, v) -> html.append("<li><b>")
+                    .append(k.getHttpMethod()).append("</b> ")
+                    .append(k.getUrl()).append(" &rarr; ")
+                    .append(v.getControllerMethod().getName()).append("()</li>"));
             html.append("</ul></body></html>");
             res.getWriter().println(html.toString());
             return;
         }
 
         // 2. Vérification : est-ce un fichier physique existant ?
-        if (getServletContext().getResource(url) != null && !url.equals("/") && !mappingUrls.containsKey(key)) {
-            // C'est un fichier statique (HTML, CSS, JS), on arrête le framework ici
-            // et on laisse Tomcat servir le fichier normalement.
+        if (getServletContext().getResource(url) != null && !mappingUrls.containsKey(key)) {
+            // C'est un fichier statique (HTML, CSS, JS), on laisse Tomcat servir
             return;
         }
 
@@ -72,33 +76,36 @@ public class FrontServlet extends HttpServlet {
         UrlMapping mapping = mappingUrls.get(key);
         if (mapping != null) {
             try {
-                // On récupère la classe et la méthode directement depuis l'objet Mapping
                 Class<?> clazz = mapping.getControllerClass();
                 Method method = mapping.getControllerMethod();
 
                 // On crée une nouvelle instance du contrôleur
                 Object instance = clazz.getDeclaredConstructor().newInstance();
 
-                // On exécute la méthode
-                Object result = method.invoke(instance);
+                // ===== SPRINT 7 : injection des paramètres =====
+                Object[] args = ParameterResolver.resolve(method, req.getParameterMap());
+                Object result = method.invoke(instance, args);
+                // ===============================================
 
-                // ===== AJOUT SPRINT 6 : détection @RestApi =====
+                // ===== SPRINT 6 : détection @RestApi → renvoie du JSON =====
                 if (method.isAnnotationPresent(RestApi.class)) {
                     res.setContentType("application/json;charset=UTF-8");
                     String json = new Gson().toJson(result);
                     res.getWriter().println(json);
-                    return; // on arrête là, pas de forward vers une vue
+                    return;
                 }
-                // ===============================================
+                // ===========================================================
 
-                // --- GESTION DU RETOUR (code existant inchangé) ---
+                // --- GESTION DU RETOUR ---
                 if (result instanceof ModelAndView) {
                     ModelAndView mv = (ModelAndView) result;
+
                     // 1. Injecter les données du modèle dans les attributs de la requête
                     mv.getData().forEach(req::setAttribute);
 
                     // 2. Construire le chemin de la vue et faire un forward
                     String viewPath = this.viewPrefix + mv.getView() + this.viewSuffix;
+                    System.out.println("FrontServlet: forward vers " + viewPath);
                     req.getRequestDispatcher(viewPath).forward(req, res);
 
                 } else if (result instanceof String) {
@@ -108,7 +115,7 @@ public class FrontServlet extends HttpServlet {
                 }
 
             } catch (Exception e) {
-                e.printStackTrace(); // Utile pour le débogage
+                e.printStackTrace();
                 res.sendError(500, "Erreur lors de l'exécution de la méthode du contrôleur : " + e.getMessage());
             }
         } else {
