@@ -1,83 +1,144 @@
 package framework;
 
+import framework.mg.itu.annotation.RequestFile;
+import framework.mg.itu.files.MapFile;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-/**
- * Sprint 7 : convertit les paramètres HTTP d'une requête
- * en arguments typés pour une méthode de contrôleur.
- *
- * Ne gère QUE les types primitifs, leurs wrappers, et String.
- */
 public class ParameterResolver {
 
-    /**
-     * Construit le tableau d'arguments à passer à method.invoke().
-     *
-     * @param method la méthode du contrôleur
-     * @param params map des paramètres HTTP (nom → valeurs[])
-     * @return tableau d'arguments prêt à l'emploi
-     */
-    public static Object[] resolve(Method method, Map<String, String[]> params) {
+    public static Object[] resolve(Method method, HttpServletRequest request) throws Exception {
         Parameter[] methodParams = method.getParameters();
         Object[] args = new Object[methodParams.length];
 
+        boolean isMultipart = isMultipartRequest(request);
+
+        Map<String, String[]> params = null;
+        if (!isMultipart) {
+            params = request.getParameterMap();
+        }
+
         for (int i = 0; i < methodParams.length; i++) {
             Parameter p = methodParams[i];
-            String name = p.getName();          // nécessite -parameters à la compilation
-            String[] values = params.get(name);
+            Class<?> paramType = p.getType();
 
-            if (values == null || values.length == 0) {
-                args[i] = defaultValueFor(p.getType());
+            if (p.isAnnotationPresent(RequestFile.class)) {
+                RequestFile rf = p.getAnnotation(RequestFile.class);
+                String name = rf.value().isEmpty() ? p.getName() : rf.value();
+                args[i] = extractMapFile(request, name, isMultipart);
+                continue;
+            }
+
+            if (paramType.equals(MapFile.class)) {
+                args[i] = extractMapFile(request, p.getName(), isMultipart);
+                continue;
+            }
+
+            String paramName = p.getName();
+
+            String value = null;
+            if (isMultipart) {
+                value = getMultipartTextPart(request, paramName);
             } else {
-                args[i] = convert(values[0], p.getType());
+                String[] valuesArr = params != null ? params.get(paramName) : null;
+                if (valuesArr != null && valuesArr.length > 0) {
+                    value = valuesArr[0];
+                }
+            }
+
+            if (value == null) {
+                args[i] = defaultValueFor(paramType);
+            } else {
+                args[i] = convert(value, paramType);
             }
         }
         return args;
     }
 
-    /**
-     * Valeur par défaut pour un type primitif quand le paramètre est absent.
-     */
-    public static Object defaultValueFor(Class<?> type) {
-        if (!type.isPrimitive()) return null;
-        if (type == int.class)     return 0;
-        if (type == long.class)    return 0L;
-        if (type == double.class)  return 0.0d;
-        if (type == float.class)   return 0.0f;
-        if (type == boolean.class) return false;
-        if (type == short.class)   return (short) 0;
-        if (type == byte.class)    return (byte) 0;
-        if (type == char.class)    return '\0';
+    private static boolean isMultipartRequest(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        if (contentType == null) return false;
+        return contentType.toLowerCase().startsWith("multipart/");
+    }
+
+    private static String getMultipartTextPart(HttpServletRequest request, String name) throws IOException, ServletException {
+        try {
+            for (Part part : request.getParts()) {
+                if (part.getName().equals(name)) {
+                    String submitted = part.getSubmittedFileName();
+                    if (submitted == null || submitted.isEmpty()) {
+                        byte[] bytes = part.getInputStream().readAllBytes();
+                        if (bytes.length > 0) {
+                            return new String(bytes, StandardCharsets.UTF_8);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
         return null;
     }
 
-    /**
-     * Convertit une String HTTP en type cible.
-     * En cas d'échec : retourne la valeur par défaut (pas d'exception).
-     */
-    public static Object convert(String value, Class<?> type) {
-        if (value == null) return defaultValueFor(type);
-
+    private static MapFile extractMapFile(HttpServletRequest request, String name, boolean isMultipart) throws IOException, ServletException {
+        if (!isMultipart) return null;
         try {
-            if (type == String.class) return value;
-
-            if (type == int.class || type == Integer.class)     return Integer.parseInt(value);
-            if (type == long.class || type == Long.class)       return Long.parseLong(value);
-            if (type == double.class || type == Double.class)   return Double.parseDouble(value);
-            if (type == float.class || type == Float.class)     return Float.parseFloat(value);
-            if (type == boolean.class || type == Boolean.class) return Boolean.parseBoolean(value);
-            if (type == short.class || type == Short.class)     return Short.parseShort(value);
-            if (type == byte.class || type == Byte.class)       return Byte.parseByte(value);
-            if (type == char.class || type == Character.class) {
-                return value.isEmpty() ? '\0' : value.charAt(0);
+            for (Part part : request.getParts()) {
+                if (part.getName().equals(name)) {
+                    String submittedFileName = part.getSubmittedFileName();
+                    if (submittedFileName == null || submittedFileName.isEmpty()) {
+                        continue;
+                    }
+                    InputStream is = part.getInputStream();
+                    byte[] bytes = is.readAllBytes();
+                    String contentType = part.getContentType();
+                    MapFile mf = new MapFile(submittedFileName, contentType, bytes);
+                    return mf;
+                }
             }
-        } catch (NumberFormatException e) {
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    public static Object defaultValueFor(Class<?> type) {
+        if (!type.isPrimitive()) return null;
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == double.class) return 0.0d;
+        if (type == float.class) return 0.0f;
+        if (type == boolean.class) return false;
+        if (type == short.class) return (short) 0;
+        if (type == byte.class) return (byte) 0;
+        if (type == char.class) return '\0';
+        return null;
+    }
+
+    public static Object convert(String value, Class<?> type) {
+        if (value == null || value.trim().isEmpty()) {
             return defaultValueFor(type);
         }
-
-        // Type non supporté (POJO, Date, etc.) → null
+        try {
+            if (type == String.class) return value;
+            if (type == int.class || type == Integer.class) return Integer.parseInt(value);
+            if (type == long.class || type == Long.class) return Long.parseLong(value);
+            if (type == double.class || type == Double.class) return Double.parseDouble(value);
+            if (type == float.class || type == Float.class) return Float.parseFloat(value);
+            if (type == boolean.class || type == Boolean.class) return Boolean.parseBoolean(value);
+            if (type == short.class || type == Short.class) return Short.parseShort(value);
+            if (type == byte.class || type == Byte.class) return Byte.parseByte(value);
+            if (type == char.class || type == Character.class) return value.charAt(0);
+        } catch (Exception e) {
+            return defaultValueFor(type);
+        }
         return null;
     }
 }
