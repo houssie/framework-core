@@ -3,6 +3,7 @@ package framework;
 import framework.mg.itu.annotation.RestApi;
 import framework.mg.itu.annotation.Url;
 import framework.mg.itu.annotation.UrlMapping;
+import framework.mg.itu.annotation.Auth;
 import framework.mg.itu.annotation.UrlMethod;
 import framework.mg.itu.view.ModelAndView;
 import jakarta.servlet.ServletException;
@@ -69,6 +70,15 @@ public class FrontServlet extends HttpServlet {
             try {
                 Class<?> clazz = mapping.getControllerClass();
                 Method method = mapping.getControllerMethod();
+
+                // Sprint 10 : vérification authentification
+                if (method.isAnnotationPresent(Auth.class)) {
+                    HttpSession session = req.getSession(false);
+                    if (session == null || session.getAttribute("user") == null) {
+                        res.sendError(401, "Authentification requise");
+                        return;
+                    }
+                }
 
                 Object instance = clazz.getDeclaredConstructor().newInstance();
 
