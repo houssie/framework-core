@@ -4,6 +4,7 @@ import framework.mg.itu.annotation.RestApi;
 import framework.mg.itu.annotation.Url;
 import framework.mg.itu.annotation.UrlMapping;
 import framework.mg.itu.annotation.Auth;
+import framework.mg.itu.annotation.Role;
 import framework.mg.itu.annotation.UrlMethod;
 import framework.mg.itu.view.ModelAndView;
 import jakarta.servlet.ServletException;
@@ -76,6 +77,18 @@ public class FrontServlet extends HttpServlet {
                     HttpSession session = req.getSession(false);
                     if (session == null || session.getAttribute("user") == null) {
                         res.sendError(401, "Authentification requise");
+                        return;
+                    }
+                }
+
+                // Sprint 10bis : vérification du rôle
+                if (method.isAnnotationPresent(Role.class)) {
+                    Role roleAnnotation = method.getAnnotation(Role.class);
+                    String requiredRole = roleAnnotation.value();
+                    HttpSession session = req.getSession(false);
+                    Object userRole = (session != null) ? session.getAttribute("role") : null;
+                    if (userRole == null || !requiredRole.equals(userRole.toString())) {
+                        res.sendError(403, "Rôle insuffisant : " + requiredRole);
                         return;
                     }
                 }
