@@ -6,6 +6,7 @@ import framework.mg.itu.files.MapFile;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Part;
+import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,6 +41,11 @@ public class ParameterResolver {
 
             if (paramType.equals(MapFile.class)) {
                 args[i] = extractMapFile(request, p.getName(), isMultipart);
+                continue;
+            }
+
+            if (paramType == HttpSession.class) {
+                args[i] = request.getSession();
                 continue;
             }
 
